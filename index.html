@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeZone AI - WhatsApp Chatbot</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .phone-container {
+            width: 350px;
+            height: 650px;
+            background: #000;
+            border-radius: 30px;
+            padding: 10px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+        }
+        
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: #fff;
+            border-radius: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .whatsapp-header {
+            background: #075e54;
+            color: white;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .back-arrow {
+            font-size: 20px;
+            cursor: pointer;
+        }
+        
+        .bot-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(45deg, #25d366, #128c7e);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .chat-info {
+            flex: 1;
+        }
+        
+        .contact-name {
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .status {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        .menu-dots {
+            font-size: 20px;
+            cursor: pointer;
+        }
+        
+        .chat-area {
+            height: calc(100% - 130px);
+            overflow-y: auto;
+            padding: 15px;
+            background: #e5ddd5;
+            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><defs><pattern id="pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="0.5" fill="%23d4d4d4" opacity="0.3"/></pattern></defs><rect width="100" height="100" fill="url(%23pattern)"/></svg>');
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+        }
+        
+        .message.bot {
+            justify-content: flex-start;
+        }
+        
+        .message.user {
+            justify-content: flex-end;
+        }
+        
+        .message-bubble {
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 7px;
+            position: relative;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        .message.bot .message-bubble {
+            background: #fff;
+            box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+        }
+        
+        .message.user .message-bubble {
+            background: #dcf8c6;
+            box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+        }
+        
+        .message-text {
+            font-size: 14px;
+            line-height: 1.4;
+            margin-bottom: 4px;
+        }
+        
+        .message-time {
+            font-size: 11px;
+            color: #667781;
+            text-align: right;
+        }
+        
+        .message.user .message-time {
+            color: #4a4a4a;
+        }
+        
+        .typing-indicator {
+            display: none;
+            align-items: center;
+            gap: 5px;
+            padding: 8px 12px;
+            background: #fff;
+            border-radius: 7px;
+            box-shadow: 0 1px 0.5px rgba(0,0,0,0.13);
+            margin-bottom: 15px;
+        }
+        
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background: #999;
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+        
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        
+        .input-area {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: #f0f0f0;
+            gap: 10px;
+        }
+        
+        .attachment-btn, .voice-btn, .send-btn {
+            width: 35px;
+            height: 35px;
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .attachment-btn, .voice-btn {
+            background: transparent;
+            color: #54656f;
+        }
+        
+        .send-btn {
+            background: #25d366;
+            color: white;
+        }
+        
+        .message-input {
+            flex: 1;
+            border: none;
+            background: #fff;
+            border-radius: 20px;
+            padding: 8px 15px;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        .quick-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .quick-btn {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            color: #1976d2;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .quick-btn:hover {
+            background: #2196f3;
+            color: white;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: bold;
+            margin-left: 5px;
+        }
+        
+        .status-received { background: #fff3cd; color: #856404; }
+        .status-processing { background: #d1ecf1; color: #0c5460; }
+        .status-dispatched { background: #d4edda; color: #155724; }
+        
+        .tracking-links {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .tracking-link {
+            display: inline-block;
+            background: #1976d2;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 15px;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .tracking-link:hover {
+            background: #1565c0;
+            transform: scale(1.02);
+        }
+        
+        .police-link {
+            background: #d32f2f;
+        }
+        
+        .police-link:hover {
+            background: #c62828;
+        }
+        
+        .community-link {
+            background: #388e3c;
+        }
+        
+        .community-link:hover {
+            background: #2e7d32;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+        
+        .logo-text {
+            font-size: 10px;
+            margin-top: 4px;
+            opacity: 0.7;
+        }
+        
+        .priority-high { border-left: 4px solid #ff4444; }
+        .priority-medium { border-left: 4px solid #ffaa00; }
+        .priority-low { border-left: 4px solid #00aa44; }
+        
+        .link-disclaimer {
+            font-size: 10px;
+            color: #666;
+            margin-top: 5px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-container">
+        <div class="phone-screen">
+            <div class="whatsapp-header">
+                <div class="back-arrow">←</div>
+                <div class="bot-avatar">
+                    SZ
+                    <div class="logo-text">AI</div>
+                </div>
+                <div class="chat-info">
+                    <div class="contact-name">SafeZone AI</div>
+                    <div class="status">Online • Powered by Bolunga</div>
+                </div>
+                <div class="menu-dots">⋮</div>
+            </div>
+            
+            <div class="chat-area" id="chatArea">
+                <div class="message bot">
+                    <div class="message-bubble">
+                        <div class="message-text">🛡️ <strong>Sawubona! Welcome to SafeZone AI</strong><br><br>I'm here to help you report safety incidents in your community. You can chat with me in any language - English, isiZulu, Afrikaans, Sesotho, or any other SA language!</div>
+                        <div class="message-time">09:30</div>
+                        <div class="quick-actions">
+                            <div class="quick-btn" onclick="sendQuickMessage('Report Crime')">🚨 Report Crime</div>
+                            <div class="quick-btn" onclick="sendQuickMessage('Emergency')">🆘 Emergency</div>
+                            <div class="quick-btn" onclick="sendQuickMessage('Suspicious Activity')">👀 Suspicious Activity</div>
+                            <div class="quick-btn" onclick="sendQuickMessage('Help')">❓ Help</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <span style="margin-left: 5px; font-size: 12px; color: #667781;">SafeZone AI is typing...</span>
+            </div>
+            
+            <div class="input-area">
+                <div class="attachment-btn">📎</div>
+                <input type="text" class="message-input" id="messageInput" placeholder="Type your safety report..." onkeypress="handleKeyPress(event)">
+                <div class="voice-btn">🎤</div>
+                <div class="send-btn" onclick="sendMessage()">➤</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let conversationState = 'initial';
+        let reportData = {};
+        
+        const responses = {
+            'report crime': {
+                text: "🚨 <strong>I'm here to help you report a crime safely and anonymously.</strong><br><br>Please describe what happened. Include:<br>• What type of incident<br>• When it occurred<br>• Location (area/landmark)<br>• Any other details<br><br>Your identity will remain completely anonymous.",
+                state: 'reporting'
+            },
+            'emergency': {
+                text: "🆘 <strong>EMERGENCY DETECTED</strong><br><br>If this is a life-threatening emergency, please call:<br>📞 <strong>10111 (SAPS)</strong><br>📞 <strong>10177 (Ambulance)</strong><br><br>For immediate community response, please describe your emergency and location:",
+                state: 'emergency'
+            },
+            'suspicious activity': {
+                text: "👀 <strong>Thanks for keeping our community safe!</strong><br><br>Please describe the suspicious activity:<br>• What did you observe?<br>• Where is this happening?<br>• When did you notice it?<br>• Are there people involved?",
+                state: 'reporting'
+            },
+            'help': {
+                text: "❓ <strong>SafeZone AI Help</strong><br><br>I can help you with:<br>• Report crimes anonymously<br>• Handle emergencies<br>• Report suspicious activities<br>• Community safety tips<br>• Find local emergency contacts<br><br>Just tell me what you need!",
+                state: 'help'
+            }
+        };
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+        
+        function sendQuickMessage(message) {
+            addMessage(message, 'user');
+            setTimeout(() => {
+                const response = responses[message.toLowerCase()];
+                if (response) {
+                    showTyping();
+                    setTimeout(() => {
+                        hideTyping();
+                        addMessage(response.text, 'bot');
+                        conversationState = response.state;
+                    }, 1500);
+                }
+            }, 500);
+        }
+        
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (message) {
+                addMessage(message, 'user');
+                input.value = '';
+                
+                setTimeout(() => {
+                    processMessage(message);
+                }, 800);
+            }
+        }
+        
+        function processMessage(message) {
+            showTyping();
+            
+            setTimeout(() => {
+                hideTyping();
+                
+                if (conversationState === 'reporting' || conversationState === 'emergency') {
+                    handleReport(message);
+                } else {
+                    handleGeneralQuery(message);
+                }
+            }, 2000);
+        }
+        
+        function handleReport(message) {
+            // Simulate AI processing
+            const reportId = 'SZ' + Math.floor(Math.random() * 10000);
+            const priority = determinePriority(message);
+            const location = extractLocation(message);
+            const category = categorizeIncident(message);
+            const stationCode = generateStationCode(location);
+            
+            let response = `✅ <strong>Report Received & Processed</strong><br><br>`;
+            response += `📋 <strong>Report ID:</strong> ${reportId}<br>`;
+            response += `📍 <strong>Location:</strong> ${location}<br>`;
+            response += `🏷️ <strong>Category:</strong> ${category}<br>`;
+            response += `⚠️ <strong>Priority:</strong> ${priority}<br>`;
+            response += `🏢 <strong>Station:</strong> ${stationCode}<br><br>`;
+            
+            if (priority === 'HIGH') {
+                response += `🚨 <strong>HIGH PRIORITY ALERT</strong><br>Local responders have been notified immediately.<br><br>`;
+            }
+            
+            response += `Your report is being processed by our AI system. Local safety responders will be alerted within 5 minutes.<br><br>`;
+            response += `Stay safe! 🛡️`;
+            
+            const statusBadge = priority === 'HIGH' ? 'status-dispatched' : 'status-processing';
+            
+            // Create tracking links
+            const trackingLinks = generateTrackingLinks(reportId, stationCode, location);
+            
+            addMessage(response, 'bot', `priority-${priority.toLowerCase()}`, statusBadge, trackingLinks);
+            
+            // Send follow-up with additional links
+            setTimeout(() => {
+                const followUp = `📱 <strong>Update on Report ${reportId}</strong><br><br>✅ Report verified by AI<br>📤 Dispatched to local responders<br>⏱️ Expected response: 8-15 minutes<br>👮‍♂️ Case assigned to ${stationCode}<br><br>Thank you for helping keep our community safe!`;
+                const followUpLinks = generateFollowUpLinks(reportId, stationCode);
+                addMessage(followUp, 'bot', '', 'status-dispatched', followUpLinks);
+            }, 5000);
+        }
+        
+        function generateStationCode(location) {
+            const stations = {
+                'soweto': 'Soweto SAPS (011-938-5000)',
+                'alexandra': 'Alexandra SAPS (011-888-4200)',
+                'mdantsane': 'Mdantsane SAPS (043-702-3600)',
+                'khayelitsha': 'Khayelitsha SAPS (021-360-1200)',
+                'diepsloot': 'Diepsloot SAPS (011-355-7300)',
+                'orange farm': 'Orange Farm SAPS (011-857-2400)',
+                'default': 'Johannesburg Central SAPS (011-375-5911)'
+            };
+            
+            const locationKey = location.toLowerCase();
+            return stations[locationKey] || stations['default'];
+        }
+        
+        function generateTrackingLinks(reportId, stationCode, location) {
+            return `
+                <div class="tracking-links">
+                    <a href="javascript:void(0)" class="tracking-link police-link" onclick="startLiveTracking('${reportId}', '${location}')">
+                        🚔 Track Police Live
+                    </a>
+                    <a href="javascript:void(0)" class="tracking-link" onclick="showMapView('${reportId}', '${location}')">
+                        🗺️ View on Map
+                    </a>
+                    <a href="javascript:void(0)" class="tracking-link community-link" onclick="showResponseTeam('${reportId}')">
+                        👮‍♂️ Response Team Info
+                    </a>
+                </div>
+                <div class="link-disclaimer">Click to track police response in real-time</div>
+            `;
+        }
+        
+        function generateFollowUpLinks(reportId, stationCode) {
+            return `
+                <div class="tracking-links">
+                    <a href="javascript:void(0)" class="tracking-link police-link" onclick="updateLiveTracking('${reportId}')">
+                        📍 Live Location Update
+                    </a>
+                    <a href="javascript:void(0)" class="tracking-link" onclick="getETA('${reportId}')">
+                        ⏱️ Get Current ETA
+                    </a>
+                </div>
+            `;
+        }
+        
+        function startLiveTracking(reportId, location) {
+            let trackingInfo = `🚔 <strong>Live Police Tracking - ${reportId}</strong><br><br>`;
+            trackingInfo += `📍 <strong>Your Location:</strong> ${location}<br>`;
+            trackingInfo += `🚓 <strong>Assigned Unit:</strong> SAPS-${Math.floor(Math.random() * 999)}<br><br>`;
+            trackingInfo += `📊 <strong>Current Status:</strong><br>`;
+            trackingInfo += `🟢 Unit dispatched and en route<br>`;
+            trackingInfo += `📍 Distance: 2.3 km away<br>`;
+            trackingInfo += `⏱️ ETA: 8-12 minutes<br>`;
+            trackingInfo += `🚗 Speed: 45 km/h<br><br>`;
+            trackingInfo += `🔄 <strong>Live Updates:</strong><br>`;
+            trackingInfo += `• Officer contacted your area CPF<br>`;
+            trackingInfo += `• Unit turning onto your street<br>`;
+            trackingInfo += `• ETA updated: 6 minutes<br><br>`;
+            trackingInfo += `📞 You'll get an SMS when they arrive!`;
+            
+            addMessage(trackingInfo, 'bot');
+            
+            // Simulate live updates every 30 seconds
+            setTimeout(() => updateLiveTracking(reportId), 30000);
+        }
+        
+        function updateLiveTracking(reportId) {
+            // Simulate moving closer
+            const distances = ['1.8 km', '1.2 km', '0.8 km', '0.3 km', 'Arrived'];
+            const etas = ['6-8 min', '4-6 min', '2-4 min', '1-2 min', 'Now'];
+            const currentIndex = Math.floor(Math.random() * distances.length);
+            
+            let updateInfo = `📍 <strong>Location Update - ${reportId}</strong><br><br>`;
+            updateInfo += `🚔 <strong>Police Unit Status:</strong><br>`;
+            updateInfo += `📍 Distance: ${distances[currentIndex]}<br>`;
+            updateInfo += `⏱️ ETA: ${etas[currentIndex]}<br><br>`;
+            
+            if (currentIndex < 3) {
+                updateInfo += `🔄 <strong>Current Activity:</strong><br>`;
+                updateInfo += `• Moving through traffic<br>`;
+                updateInfo += `• GPS tracking active<br>`;
+                updateInfo += `• Officer preparing for arrival<br><br>`;
+                updateInfo += `💡 Stay in a safe location until they arrive.`;
+            } else if (currentIndex === 4) {
+                updateInfo += `✅ <strong>POLICE ARRIVED</strong><br>`;
+                updateInfo += `👮‍♂️ Officer at your location<br>`;
+                updateInfo += `📞 They may call you shortly<br><br>`;
+                updateInfo += `🛡️ You're now safe! Thank you for reporting.`;
+            } else {
+                updateInfo += `🚗 <strong>Almost There!</strong><br>`;
+                updateInfo += `• Officer can see your area<br>`;
+                updateInfo += `• Looking for exact location<br>`;
+                updateInfo += `• Be ready to wave or signal<br><br>`;
+                updateInfo += `📱 Keep your phone ready for their call.`;
+            }
+            
+            addMessage(updateInfo, 'bot');
+        }
+        
+        function showMapView(reportId, location) {
+            let mapInfo = `🗺️ <strong>Live Map View - ${reportId}</strong><br><br>`;
+            mapInfo += `📍 <strong>Incident Location:</strong> ${location}<br>`;
+            mapInfo += `🚔 <strong>Police Route:</strong><br><br>`;
+            mapInfo += `🛣️ <strong>Route Details:</strong><br>`;
+            mapInfo += `• Starting: ${generateStationCode(location).split(' ')[0]} Station<br>`;
+            mapInfo += `• Via: Main Road → ${location} Taxi Rank<br>`;
+            mapInfo += `• Destination: Your reported location<br><br>`;
+            mapInfo += `📊 <strong>Traffic Conditions:</strong><br>`;
+            mapInfo += `🟢 Light traffic on main routes<br>`;
+            mapInfo += `🟡 Moderate traffic near taxi rank<br><br>`;
+            mapInfo += `🎯 The officer can see your exact area and is navigating the best route to reach you quickly.`;
+            
+            addMessage(mapInfo, 'bot');
+        }
+        
+        function showResponseTeam(reportId) {
+            const teamMembers = [
+                'Const. Mthembu (Badge #4521)',
+                'Const. Van Der Merwe (Badge #4892)',
+                'Sgt. Dlamini (Badge #3341)',
+                'Const. Pillay (Badge #4756)'
+            ];
+            
+            const assignedOfficer = teamMembers[Math.floor(Math.random() * teamMembers.length)];
+            const partnerOfficer = teamMembers[Math.floor(Math.random() * teamMembers.length)];
+            
+            let teamInfo = `👮‍♂️ <strong>Response Team - ${reportId}</strong><br><br>`;
+            teamInfo += `🚔 <strong>Assigned Officers:</strong><br>`;
+            teamInfo += `• Primary: ${assignedOfficer}<br>`;
+            teamInfo += `• Partner: ${partnerOfficer}<br><br>`;
+            teamInfo += `📱 <strong>Contact Method:</strong><br>`;
+            teamInfo += `• Radio call sign: Alpha-${Math.floor(Math.random() * 99)}<br>`;
+            teamInfo += `• Vehicle: SAPS Patrol Unit<br>`;
+            teamInfo += `• Equipment: Standard patrol gear<br><br>`;
+            teamInfo += `⚡ <strong>Response Priority:</strong><br>`;
+            teamInfo += `• High priority response<br>`;
+            teamInfo += `• Direct dispatch from station<br>`;
+            teamInfo += `• Community safety focus<br><br>`;
+            teamInfo += `🛡️ These officers are experienced in community policing and will handle your report professionally.`;
+            
+            addMessage(teamInfo, 'bot');
+        }
+        
+        function getETA(reportId) {
+            // Simulate real-time ETA calculation
+            const currentTime = new Date();
+            const etaMinutes = Math.floor(Math.random() * 15) + 3; // 3-18 minutes
+            const arrivalTime = new Date(currentTime.getTime() + etaMinutes * 60000);
+            
+            let etaInfo = `⏱️ <strong>Current ETA - ${reportId}</strong><br><br>`;
+            etaInfo += `🕒 <strong>Estimated Arrival:</strong><br>`;
+            etaInfo += `• ${etaMinutes} minutes from now<br>`;
+            etaInfo += `• Arrival time: ${arrivalTime.toLocaleTimeString()} <br>`;
+            etaInfo += `• Updated: Just now<br><br>`;
+            etaInfo += `📊 <strong>Factors Affecting ETA:</strong><br>`;
+            etaInfo += `🟢 Traffic: Light<br>`;
+            etaInfo += `🟢 Weather: Clear<br>`;
+            etaInfo += `🟡 Distance: Moderate<br><br>`;
+            etaInfo += `📍 <strong>Last Known Position:</strong><br>`;
+            etaInfo += `Moving towards your location via the fastest route.<br><br>`;
+            etaInfo += `🔄 ETA will update automatically as they get closer.`;
+            
+            addMessage(etaInfo, 'bot');
+        }
+        
+        function handleGeneralQuery(message) {
+            const lowerMessage = message.toLowerCase();
+            
+            let response = "🤖 <strong>AI Analysis Complete</strong><br><br>";
+            
+            if (lowerMessage.includes('crime') || lowerMessage.includes('theft') || lowerMessage.includes('robbery')) {
+                response += "I detected you might want to report a crime. Would you like me to help you file an anonymous report?";
+            } else if (lowerMessage.includes('emergency') || lowerMessage.includes('help') || lowerMessage.includes('urgent')) {
+                response += "This sounds urgent. If it's an emergency, please call 10111. Otherwise, I can help you report it to local community responders.";
+            } else {
+                response += "I'm here to help with safety reporting. You can tell me about any incidents, suspicious activities, or emergencies in your area. Everything is anonymous and secure.";
+            }
+            
+            addMessage(response, 'bot');
+        }
+        
+        function determinePriority(message) {
+            const highPriorityWords = ['emergency', 'urgent', 'shooting', 'robbery', 'attack', 'violence', 'weapon'];
+            const mediumPriorityWords = ['theft', 'break', 'suspicious', 'fighting'];
+            
+            const lowerMessage = message.toLowerCase();
+            
+            if (highPriorityWords.some(word => lowerMessage.includes(word))) {
+                return 'HIGH';
+            } else if (mediumPriorityWords.some(word => lowerMessage.includes(word))) {
+                return 'MEDIUM';
+            } else {
+                return 'LOW';
+            }
+        }
+        
+        function extractLocation(message) {
+            // Simple location extraction simulation
+            const locations = ['Soweto', 'Alexandra', 'Mdantsane', 'Khayelitsha', 'Diepsloot', 'Orange Farm'];
+            const foundLocation = locations.find(loc => message.toLowerCase().includes(loc.toLowerCase()));
+            return foundLocation || 'Johannesburg Central';
+        }
+        
+        function categorizeIncident(message) {
+            const lowerMessage = message.toLowerCase();
+            
+            if (lowerMessage.includes('theft') || lowerMessage.includes('steal')) return 'Theft';
+            if (lowerMessage.includes('fight') || lowerMessage.includes('violence')) return 'Violence';
+            if (lowerMessage.includes('suspicious') || lowerMessage.includes('strange')) return 'Suspicious Activity';
+            if (lowerMessage.includes('drug') || lowerMessage.includes('substance')) return 'Drug Related';
+            if (lowerMessage.includes('noise') || lowerMessage.includes('loud')) return 'Disturbance';
+            
+            return 'General Safety Concern';
+        }
+        
+        function addMessage(text, sender, priority = '', status = '', trackingLinks = '') {
+            const chatArea = document.getElementById('chatArea');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender} ${priority}`;
+            
+            const time = new Date().toLocaleTimeString('en-US', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false 
+            });
+            
+            let statusBadge = '';
+            if (status) {
+                const statusText = status.includes('received') ? 'RECEIVED' : 
+                                status.includes('processing') ? 'PROCESSING' : 'DISPATCHED';
+                statusBadge = `<span class="status-badge ${status}">${statusText}</span>`;
+            }
+            
+            messageDiv.innerHTML = `
+                <div class="message-bubble">
+                    <div class="message-text">${text}${statusBadge}${trackingLinks}</div>
+                    <div class="message-time">${time}</div>
+                </div>
+            `;
+            
+            chatArea.appendChild(messageDiv);
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+        
+        function showTyping() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            typingIndicator.style.display = 'flex';
+            
+            const chatArea = document.getElementById('chatArea');
+            chatArea.scrollTop = chatArea.scrollHeight;
+        }
+        
+        function hideTyping() {
+            const typingIndicator = document.getElementById('typingIndicator');
+            typingIndicator.style.display = 'none';
+        }
+        
+        // Demo mode - send a sample report after 3 seconds
+        setTimeout(() => {
+            addMessage("There's suspicious people walking around my street in Soweto asking about people's houses and looking through windows. This happened about 30 minutes ago near the taxi rank.", 'user');
+            
+            setTimeout(() => {
+                showTyping();
+                setTimeout(() => {
+                    hideTyping();
+                    handleReport("There's suspicious people walking around my street in Soweto asking about people's houses and looking through windows. This happened about 30 minutes ago near the taxi rank.");
+                }, 2000);
+            }, 1000);
+        }, 3000);
+    </script>
+</body>
+</html>
