@@ -239,6 +239,48 @@
         .status-processing { background: #d1ecf1; color: #0c5460; }
         .status-dispatched { background: #d4edda; color: #155724; }
         
+        .tracking-links {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        
+        .tracking-link {
+            display: inline-block;
+            background: #1976d2;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 15px;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .tracking-link:hover {
+            background: #1565c0;
+            transform: scale(1.02);
+        }
+        
+        .police-link {
+            background: #d32f2f;
+        }
+        
+        .police-link:hover {
+            background: #c62828;
+        }
+        
+        .community-link {
+            background: #388e3c;
+        }
+        
+        .community-link:hover {
+            background: #2e7d32;
+        }
+        
         @keyframes slideIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
@@ -258,6 +300,13 @@
         .priority-high { border-left: 4px solid #ff4444; }
         .priority-medium { border-left: 4px solid #ffaa00; }
         .priority-low { border-left: 4px solid #00aa44; }
+        
+        .link-disclaimer {
+            font-size: 10px;
+            color: #666;
+            margin-top: 5px;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -385,12 +434,14 @@
             const priority = determinePriority(message);
             const location = extractLocation(message);
             const category = categorizeIncident(message);
+            const stationCode = generateStationCode(location);
             
             let response = `✅ <strong>Report Received & Processed</strong><br><br>`;
             response += `📋 <strong>Report ID:</strong> ${reportId}<br>`;
             response += `📍 <strong>Location:</strong> ${location}<br>`;
             response += `🏷️ <strong>Category:</strong> ${category}<br>`;
-            response += `⚠️ <strong>Priority:</strong> ${priority}<br><br>`;
+            response += `⚠️ <strong>Priority:</strong> ${priority}<br>`;
+            response += `🏢 <strong>Station:</strong> ${stationCode}<br><br>`;
             
             if (priority === 'HIGH') {
                 response += `🚨 <strong>HIGH PRIORITY ALERT</strong><br>Local responders have been notified immediately.<br><br>`;
@@ -401,13 +452,182 @@
             
             const statusBadge = priority === 'HIGH' ? 'status-dispatched' : 'status-processing';
             
-            addMessage(response, 'bot', `priority-${priority.toLowerCase()}`, statusBadge);
+            // Create tracking links
+            const trackingLinks = generateTrackingLinks(reportId, stationCode, location);
             
-            // Send follow-up
+            addMessage(response, 'bot', `priority-${priority.toLowerCase()}`, statusBadge, trackingLinks);
+            
+            // Send follow-up with additional links
             setTimeout(() => {
-                const followUp = `📱 <strong>Update on Report ${reportId}</strong><br><br>✅ Report verified by AI<br>📤 Dispatched to local responders<br>⏱️ Expected response: 8-15 minutes<br><br>Thank you for helping keep our community safe!`;
-                addMessage(followUp, 'bot', '', 'status-dispatched');
+                const followUp = `📱 <strong>Update on Report ${reportId}</strong><br><br>✅ Report verified by AI<br>📤 Dispatched to local responders<br>⏱️ Expected response: 8-15 minutes<br>👮‍♂️ Case assigned to ${stationCode}<br><br>Thank you for helping keep our community safe!`;
+                const followUpLinks = generateFollowUpLinks(reportId, stationCode);
+                addMessage(followUp, 'bot', '', 'status-dispatched', followUpLinks);
             }, 5000);
+        }
+        
+        function generateStationCode(location) {
+            const stations = {
+                'soweto': 'Soweto SAPS (011-938-5000)',
+                'alexandra': 'Alexandra SAPS (011-888-4200)',
+                'mdantsane': 'Mdantsane SAPS (043-702-3600)',
+                'khayelitsha': 'Khayelitsha SAPS (021-360-1200)',
+                'diepsloot': 'Diepsloot SAPS (011-355-7300)',
+                'orange farm': 'Orange Farm SAPS (011-857-2400)',
+                'default': 'Johannesburg Central SAPS (011-375-5911)'
+            };
+            
+            const locationKey = location.toLowerCase();
+            return stations[locationKey] || stations['default'];
+        }
+        
+        function generateTrackingLinks(reportId, stationCode, location) {
+            return `
+                <div class="tracking-links">
+                    <a href="javascript:void(0)" class="tracking-link police-link" onclick="startLiveTracking('${reportId}', '${location}')">
+                        🚔 Track Police Live
+                    </a>
+                    <a href="javascript:void(0)" class="tracking-link" onclick="showMapView('${reportId}', '${location}')">
+                        🗺️ View on Map
+                    </a>
+                    <a href="javascript:void(0)" class="tracking-link community-link" onclick="showResponseTeam('${reportId}')">
+                        👮‍♂️ Response Team Info
+                    </a>
+                </div>
+                <div class="link-disclaimer">Click to track police response in real-time</div>
+            `;
+        }
+        
+        function generateFollowUpLinks(reportId, stationCode) {
+            return `
+                <div class="tracking-links">
+                    <a href="javascript:void(0)" class="tracking-link police-link" onclick="updateLiveTracking('${reportId}')">
+                        📍 Live Location Update
+                    </a>
+                    <a href="javascript:void(0)" class="tracking-link" onclick="getETA('${reportId}')">
+                        ⏱️ Get Current ETA
+                    </a>
+                </div>
+            `;
+        }
+        
+        function startLiveTracking(reportId, location) {
+            let trackingInfo = `🚔 <strong>Live Police Tracking - ${reportId}</strong><br><br>`;
+            trackingInfo += `📍 <strong>Your Location:</strong> ${location}<br>`;
+            trackingInfo += `🚓 <strong>Assigned Unit:</strong> SAPS-${Math.floor(Math.random() * 999)}<br><br>`;
+            trackingInfo += `📊 <strong>Current Status:</strong><br>`;
+            trackingInfo += `🟢 Unit dispatched and en route<br>`;
+            trackingInfo += `📍 Distance: 2.3 km away<br>`;
+            trackingInfo += `⏱️ ETA: 8-12 minutes<br>`;
+            trackingInfo += `🚗 Speed: 45 km/h<br><br>`;
+            trackingInfo += `🔄 <strong>Live Updates:</strong><br>`;
+            trackingInfo += `• Officer contacted your area CPF<br>`;
+            trackingInfo += `• Unit turning onto your street<br>`;
+            trackingInfo += `• ETA updated: 6 minutes<br><br>`;
+            trackingInfo += `📞 You'll get an SMS when they arrive!`;
+            
+            addMessage(trackingInfo, 'bot');
+            
+            // Simulate live updates every 30 seconds
+            setTimeout(() => updateLiveTracking(reportId), 30000);
+        }
+        
+        function updateLiveTracking(reportId) {
+            // Simulate moving closer
+            const distances = ['1.8 km', '1.2 km', '0.8 km', '0.3 km', 'Arrived'];
+            const etas = ['6-8 min', '4-6 min', '2-4 min', '1-2 min', 'Now'];
+            const currentIndex = Math.floor(Math.random() * distances.length);
+            
+            let updateInfo = `📍 <strong>Location Update - ${reportId}</strong><br><br>`;
+            updateInfo += `🚔 <strong>Police Unit Status:</strong><br>`;
+            updateInfo += `📍 Distance: ${distances[currentIndex]}<br>`;
+            updateInfo += `⏱️ ETA: ${etas[currentIndex]}<br><br>`;
+            
+            if (currentIndex < 3) {
+                updateInfo += `🔄 <strong>Current Activity:</strong><br>`;
+                updateInfo += `• Moving through traffic<br>`;
+                updateInfo += `• GPS tracking active<br>`;
+                updateInfo += `• Officer preparing for arrival<br><br>`;
+                updateInfo += `💡 Stay in a safe location until they arrive.`;
+            } else if (currentIndex === 4) {
+                updateInfo += `✅ <strong>POLICE ARRIVED</strong><br>`;
+                updateInfo += `👮‍♂️ Officer at your location<br>`;
+                updateInfo += `📞 They may call you shortly<br><br>`;
+                updateInfo += `🛡️ You're now safe! Thank you for reporting.`;
+            } else {
+                updateInfo += `🚗 <strong>Almost There!</strong><br>`;
+                updateInfo += `• Officer can see your area<br>`;
+                updateInfo += `• Looking for exact location<br>`;
+                updateInfo += `• Be ready to wave or signal<br><br>`;
+                updateInfo += `📱 Keep your phone ready for their call.`;
+            }
+            
+            addMessage(updateInfo, 'bot');
+        }
+        
+        function showMapView(reportId, location) {
+            let mapInfo = `🗺️ <strong>Live Map View - ${reportId}</strong><br><br>`;
+            mapInfo += `📍 <strong>Incident Location:</strong> ${location}<br>`;
+            mapInfo += `🚔 <strong>Police Route:</strong><br><br>`;
+            mapInfo += `🛣️ <strong>Route Details:</strong><br>`;
+            mapInfo += `• Starting: ${generateStationCode(location).split(' ')[0]} Station<br>`;
+            mapInfo += `• Via: Main Road → ${location} Taxi Rank<br>`;
+            mapInfo += `• Destination: Your reported location<br><br>`;
+            mapInfo += `📊 <strong>Traffic Conditions:</strong><br>`;
+            mapInfo += `🟢 Light traffic on main routes<br>`;
+            mapInfo += `🟡 Moderate traffic near taxi rank<br><br>`;
+            mapInfo += `🎯 The officer can see your exact area and is navigating the best route to reach you quickly.`;
+            
+            addMessage(mapInfo, 'bot');
+        }
+        
+        function showResponseTeam(reportId) {
+            const teamMembers = [
+                'Const. Mthembu (Badge #4521)',
+                'Const. Van Der Merwe (Badge #4892)',
+                'Sgt. Dlamini (Badge #3341)',
+                'Const. Pillay (Badge #4756)'
+            ];
+            
+            const assignedOfficer = teamMembers[Math.floor(Math.random() * teamMembers.length)];
+            const partnerOfficer = teamMembers[Math.floor(Math.random() * teamMembers.length)];
+            
+            let teamInfo = `👮‍♂️ <strong>Response Team - ${reportId}</strong><br><br>`;
+            teamInfo += `🚔 <strong>Assigned Officers:</strong><br>`;
+            teamInfo += `• Primary: ${assignedOfficer}<br>`;
+            teamInfo += `• Partner: ${partnerOfficer}<br><br>`;
+            teamInfo += `📱 <strong>Contact Method:</strong><br>`;
+            teamInfo += `• Radio call sign: Alpha-${Math.floor(Math.random() * 99)}<br>`;
+            teamInfo += `• Vehicle: SAPS Patrol Unit<br>`;
+            teamInfo += `• Equipment: Standard patrol gear<br><br>`;
+            teamInfo += `⚡ <strong>Response Priority:</strong><br>`;
+            teamInfo += `• High priority response<br>`;
+            teamInfo += `• Direct dispatch from station<br>`;
+            teamInfo += `• Community safety focus<br><br>`;
+            teamInfo += `🛡️ These officers are experienced in community policing and will handle your report professionally.`;
+            
+            addMessage(teamInfo, 'bot');
+        }
+        
+        function getETA(reportId) {
+            // Simulate real-time ETA calculation
+            const currentTime = new Date();
+            const etaMinutes = Math.floor(Math.random() * 15) + 3; // 3-18 minutes
+            const arrivalTime = new Date(currentTime.getTime() + etaMinutes * 60000);
+            
+            let etaInfo = `⏱️ <strong>Current ETA - ${reportId}</strong><br><br>`;
+            etaInfo += `🕒 <strong>Estimated Arrival:</strong><br>`;
+            etaInfo += `• ${etaMinutes} minutes from now<br>`;
+            etaInfo += `• Arrival time: ${arrivalTime.toLocaleTimeString()} <br>`;
+            etaInfo += `• Updated: Just now<br><br>`;
+            etaInfo += `📊 <strong>Factors Affecting ETA:</strong><br>`;
+            etaInfo += `🟢 Traffic: Light<br>`;
+            etaInfo += `🟢 Weather: Clear<br>`;
+            etaInfo += `🟡 Distance: Moderate<br><br>`;
+            etaInfo += `📍 <strong>Last Known Position:</strong><br>`;
+            etaInfo += `Moving towards your location via the fastest route.<br><br>`;
+            etaInfo += `🔄 ETA will update automatically as they get closer.`;
+            
+            addMessage(etaInfo, 'bot');
         }
         
         function handleGeneralQuery(message) {
@@ -445,7 +665,7 @@
             // Simple location extraction simulation
             const locations = ['Soweto', 'Alexandra', 'Mdantsane', 'Khayelitsha', 'Diepsloot', 'Orange Farm'];
             const foundLocation = locations.find(loc => message.toLowerCase().includes(loc.toLowerCase()));
-            return foundLocation || 'Location being determined...';
+            return foundLocation || 'Johannesburg Central';
         }
         
         function categorizeIncident(message) {
@@ -460,7 +680,7 @@
             return 'General Safety Concern';
         }
         
-        function addMessage(text, sender, priority = '', status = '') {
+        function addMessage(text, sender, priority = '', status = '', trackingLinks = '') {
             const chatArea = document.getElementById('chatArea');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender} ${priority}`;
@@ -480,7 +700,7 @@
             
             messageDiv.innerHTML = `
                 <div class="message-bubble">
-                    <div class="message-text">${text}${statusBadge}</div>
+                    <div class="message-text">${text}${statusBadge}${trackingLinks}</div>
                     <div class="message-time">${time}</div>
                 </div>
             `;
