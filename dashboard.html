@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeZone AI Police Supervisor Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Theme-specific CSS variables for dynamic switching -->
+    <style>
+        :root {
+            /* Dark Theme Defaults (old colors brought back and adjusted for text) */
+            --bg-primary: #0F172A; /* Dark background for body */
+            --bg-secondary: #1A202C; /* Main app background - slightly softer dark for cards, modals */
+            --bg-tertiary: #2D3748; /* Darker header, sidebar */
+            --text-primary: #E2E8F0; /* Light text for main content */
+            --text-secondary: #A0AEC0; /* Lighter grey text */
+            --border-color: #4A5568; /* Darker border */
+            --chart-bg: #2D3748; /* Chart background in dark mode */
+            --chart-grid: rgba(74, 85, 104, 0.2); /* Dark grid lines */
+            --chart-text: #A0AEC0; /* Grey text for charts */
+            --chart-tooltip-bg: #2D3748;
+            --chart-tooltip-border: #4A5568;
+        }
+
+        body.light-theme {
+            /* Light Theme Overrides (kept for toggle functionality) */
+            --bg-primary: #F9FAFB; /* Lightest Grey for body */
+            --bg-secondary: #FFFFFF; /* White for cards, modals */
+            --bg-tertiary: #F3F4F6; /* Slightly darker light grey for header, sidebar */
+            --text-primary: #1F2937; /* Dark text */
+            --text-secondary: #4B5563; /* Medium grey text */
+            --border-color: #E5E7EB; /* Light border */
+            --chart-bg: #FFFFFF;
+            --chart-grid: rgba(229, 231, 235, 0.5); /* Lighter grid lines */
+            --chart-text: #4B5563; /* Dark text for charts */
+            --chart-tooltip-bg: #FFFFFF;
+            --chart-tooltip-border: #D1D5DB;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Prevent body scroll, main content scrolls */
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .main-content-area {
+            overflow-y: auto;
+            height: calc(100vh - 64px); /* Full viewport height minus header height */
+            background-color: var(--bg-secondary);
+        }
+        .header-bar, .sidebar {
+            background-color: var(--bg-tertiary);
+            border-color: var(--border-color);
+        }
+        .sidebar-nav-link {
+            @apply flex items-center p-3 rounded-lg transition-colors duration-200;
+            color: var(--text-secondary);
+            background-color: transparent;
+        }
+        .sidebar-nav-link:hover {
+            background-color: var(--border-color);
+        }
+        .sidebar-nav-link.active {
+            background-color: #3B82F6; /* Specific blue for active tab */
+            color: white; /* White text for active tab */
+            font-weight: 600;
+        }
+        .kpi-card, .content-section > div, .modal-content {
+            background-color: var(--bg-secondary);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+            max-width: 700px;
+            margin: auto;
+        }
+        .chart-bg-theme {
+            background-color: var(--chart-bg);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        /* Map Info Box */
+        .map-info-box {
+            position: absolute;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            z-index: 10;
+            color: var(--text-primary);
+            width: 250px; /* Slightly wider to accommodate new button/text */
+            /* Centering styles */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        .map-info-box-close {
+            float: right;
+            cursor: pointer;
+            font-weight: bold;
+            color: var(--text-secondary);
+        }
+
+        /* Fake Map Styles */
+        .fake-map-bg {
+            background-color: #0F172A; /* Darker map background */
+            position: relative;
+            overflow: hidden;
+        }
+        .fake-map-region {
+            background-color: #1A202C; /* Region background */
+            border: 1px solid #2D3748;
+            border-radius: 8px;
+            opacity: 0.7;
+        }
+        .fake-map-road {
+            background-color: #4A5568; /* Road color */
+            position: absolute;
+            z-index: 1;
+            border-radius: 2px;
+        }
+        .fake-map-label {
+            color: #A0AEC0;
+            font-size: 0.8rem;
+            position: absolute;
+            pointer-events: none;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #3B82F6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="dark-theme"> <!-- Set initial theme to dark -->
+
+    <!-- Header (Top Bar) -->
+    <header class="header-bar shadow-lg h-16 flex items-center justify-between px-6 z-20 relative border-b">
+        <div class="flex items-center">
+            <span class="text-2xl font-extrabold text-blue-500 mr-4">SafeZone AI</span>
+            <span class="text-lg text-gray-300">Police Supervisor Dashboard</span>
+        </div>
+        <div class="flex items-center space-x-6">
+            <button class="text-gray-300 text-xl hover:text-white transition-colors" onclick="console.log('Search button clicked.')">🔍</button>
+            <button class="text-gray-300 text-xl hover:text-white transition-colors" onclick="console.log('Settings button clicked from header.')">⚙️</button>
+            <div class="relative group">
+                <button class="flex items-center space-x-2 p-2 rounded-full hover:bg-gray-700 transition-colors" onclick="console.log('Supervisor profile button clicked.')">
+                    <span class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold text-sm">S</span>
+                    <span class="hidden md:inline-block font-medium text-gray-300">Supervisor</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Layout: Sidebar + Content Area -->
+    <div class="flex h-[calc(100vh-64px)]">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar w-64 p-4 flex flex-col justify-between border-r hidden md:flex">
+            <nav>
+                <ul>
+                    <li class="mb-2">
+                        <a href="#main-dashboard" class="sidebar-nav-link active">
+                            <span class="mr-3 text-xl">🏠</span> Dashboard
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a href="#incident-summary" class="sidebar-nav-link">
+                            <span class="mr-3 text-xl">🚨</span> Incidents
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a href="#responder-management" class="sidebar-nav-link">
+                            <span class="mr-3 text-xl">👮</span> Responder Units
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a href="#incident-insights" class="sidebar-nav-link">
+                            <span class="mr-3 text-xl">📊</span> Incident Insights
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a href="#heatmap-patrol" class="sidebar-nav-link">
+                            <span class="mr-3 text-xl">🗺️</span> Heatmaps & Patrol
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a href="#supervisor-alerts" class="sidebar-nav-link">
+                            <span class="mr-3 text-xl">🔔</span> Supervisor Alerts
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a href="#linked-mobile-app" class="sidebar-nav-link">
+                            <span class="mr-3 text-xl">📱</span> Linked Mobile App
+                        </a>
+                    </li>
+                    <li class="mb-2">
+                        <a href="#settings" class="sidebar-nav-link">
+                            <span class="mr-3 text-xl">⚙️</span> Settings
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div class="text-xs text-gray-500 mt-auto">
+                <p>&copy; 2025 SafeZone AI</p>
+                <p>Version 1.0.0</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 main-content-area p-6">
+
+            <!-- 1. Main Supervisor Dashboard -->
+            <section id="main-dashboard" class="content-section active">
+                <h2 class="text-3xl font-bold text-white mb-6">Dashboard Overview</h2>
+                <p class="text-gray-300 mb-8">
+                    Comprehensive real-time monitoring of public safety reports across all active communities.
+                </p>
+
+                <!-- KPI Widgets -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="kpi-card">
+                        <p class="text-sm font-medium text-gray-400">Daily Reports</p>
+                        <p class="text-4xl font-bold text-blue-400 mt-1">245</p>
+                        <p class="text-xs text-gray-500 mt-2">Today</p>
+                    </div>
+                    <div class="kpi-card">
+                        <p class="text-sm font-medium text-gray-400">Active Responders</p>
+                        <p class="text-4xl font-bold text-emerald-400 mt-1">85</p>
+                        <p class="text-xs text-gray-500 mt-2">Currently on duty</p>
+                    </div>
+                    <div class="kpi-card">
+                        <p class="text-sm font-medium text-gray-400">Avg. Response Time</p>
+                        <p class="text-4xl font-bold text-yellow-400 mt-1">04:30</p>
+                        <p class="text-xs text-gray-500 mt-2">Minutes (last 24h)</p>
+                    </div>
+                    <div class="kpi-card">
+                        <p class="text-sm font-medium text-gray-400">Pending Escalations</p>
+                        <p class="text-4xl font-bold text-red-500 mt-1">5</p>
+                        <p class="text-xs text-gray-500 mt-2">Critical incidents</p>
+                    </div>
+                </div>
+
+                <!-- Real-time Map View (on Dashboard) -->
+                <div class="kpi-card p-6 rounded-lg shadow-md mb-8 h-96 flex items-center justify-center">
+                    <div class="w-full h-full bg-gray-900 rounded-lg flex items-center justify-center text-gray-500 text-lg relative fake-map-bg">
+                        <span class="text-gray-600 absolute top-4 left-4 text-sm">[Simulated Real-time Map]</span>
+                        <!-- Fake Map Visual Elements -->
+                        <div class="fake-map-region absolute w-1/3 h-1/3 top-10 left-10">
+                            <span class="fake-map-label top-2 left-2">North Sector</span>
+                        </div>
+                        <div class="fake-map-region absolute w-1/4 h-1/4 bottom-5 right-5">
+                            <span class="fake-map-label top-2 left-2">South East</span>
+                        </div>
+                        <div class="fake-map-road" style="top: 20%; left: 0%; width: 100%; height: 5px; transform: rotate(5deg);"></div>
+                        <div class="fake-map-road" style="top: 50%; left: 0%; width: 100%; height: 5px; transform: rotate(-10deg);"></div>
+                        <div class="fake-map-road" style="top: 0%; left: 40%; height: 100%; width: 5px;"></div>
+
+                        <!-- Dynamic Incident Pins (overlayed on fake map) -->
+                        <div id="dashboardMapPinsContainer"></div>
+                        <!-- Map Info Box Container -->
+                        <div id="mapInfoBoxContainer"></div>
+                    </div>
+                </div>
+
+                <!-- Incident Summary Panel (Table) on Dashboard -->
+                <div class="kpi-card mb-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-white">Recent Incidents Summary</h3>
+                        <select id="languageFilterDashboard" class="bg-gray-700 text-gray-300 rounded-md p-2 text-sm border border-gray-600" onchange="populateIncidentSummaryTable(this.value, 'incidentSummaryTableBodyDashboard')">
+                            <option value="All">All Languages</option>
+                            <option value="Zulu">Zulu</option>
+                            <option value="Xhosa">Xhosa</option>
+                            <option value="English">English</option>
+                            <option value="Afrikaans">Afrikaans</option>
+                        </select>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Type</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Priority</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Time</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Location</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Assigned</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incidentSummaryTableBodyDashboard" class="divide-y divide-gray-800">
+                                <!-- Table rows will be dynamically populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Dashboard Section: Responder Units Summary -->
+                <div class="kpi-card mb-8 p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-white">Responder Units Snapshot</h3>
+                        <a href="#incident-summary" class="sidebar-nav-link  text-blue-400 hover:underline text-sm"  onclick="console.log('Navigated to Responder Management from Dashboard')">View All Units &gt;</a>
+                    </div>
+                    <p class="text-gray-300 mb-4">Currently, <span class="font-bold text-emerald-400">85 responders</span> are on duty, with <span class="font-bold text-blue-400">12 units</span> actively responding to incidents. Our average response time remains <span class="font-bold text-yellow-400">04:30 minutes</span>.</p>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                        <div>
+                            <p class="text-2xl font-bold text-emerald-400">12</p>
+                            <p class="text-sm text-gray-400">Responding</p>
+                        </div>
+                        <div>
+                            <p class="text-2xl font-bold text-gray-400">73</p>
+                            <p class="text-sm text-gray-400">Available</p>
+                        </div>
+                        <div>
+                            <p class="text-2xl font-bold text-red-400">2</p>
+                            <p class="text-sm text-gray-400">On Break</p>
+                        </div>
+                        <div>
+                            <p class="text-2xl font-bold text-purple-400">0</p>
+                            <p class="text-sm text-gray-400">Offline</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dashboard Section: Incident Insights Summary -->
+                <div class="kpi-card mb-8 p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-white">Incident Insights Summary</h3>
+                        <a href="#incident-insights" class="sidebar-nav-link  text-blue-400 hover:underline text-sm" onclick="console.log('Navigated to Incident Insights from Dashboard')">View Full Analytics &gt;</a>
+                    </div>
+                    <p class="text-gray-300 mb-4">Recent trends show a slight increase in reports over the last week. The most common incident types are Theft and Assault, with English being the primary reporting language.</p>
+                    <ul class="list-disc list-inside text-gray-400 text-sm space-y-1">
+                        <li>Weekly Incidents: <span class="font-semibold text-blue-400">40 (up from 35)</span></li>
+                        <li>Top Category: <span class="font-semibold text-yellow-400">Theft (25%)</span></li>
+                        <li>Most Used Language: <span class="font-semibold text-emerald-400">English (60%)</span></li>
+                    </ul>
+                </div>
+
+                <!-- Dashboard Section: Heatmap & Patrol Summary -->
+                <div class="kpi-card mb-8 p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-white">Heatmap & Patrol Overview</h3>
+                        <a href="#heatmap-patrol" class="sidebar-nav-link  text-blue-400 hover:underline text-sm" onclick="console.log('Navigated to Heatmap & Patrol from Dashboard')">Manage Zones &gt;</a>
+                    </div>
+                    <p class="text-gray-300 mb-4">Current heatmap analysis indicates that **Khayelitsha Central** and **Soweto North** are high-priority patrol zones. All active zones are currently covered by assigned units.</p>
+                    <ul class="list-disc list-inside text-gray-400 text-sm space-y-1">
+                        <li>High-Risk Zones: <span class="font-semibold text-red-400">2</span></li>
+                        <li>Active Patrol Zones: <span class="font-semibold text-blue-400">5</span></li>
+                        <li>Units Assigned to Hotspots: <span class="font-semibold text-emerald-400">All</span></li>
+                    </ul>
+                </div>
+
+                <!-- Dashboard Section: Supervisor Alerts Summary -->
+                <div class="kpi-card mb-8 p-6 rounded-lg shadow-md">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-white">Latest Supervisor Alert</h3>
+                        <a href="#supervisor-alerts" class="sidebar-nav-link  text-blue-400 hover:underline text-sm" onclick="console.log('Navigated to Supervisor Alerts from Dashboard')">View All Alerts &gt;</a>
+                    </div>
+                    <div class="flex items-start space-x-4 bg-red-800 bg-opacity-30 border border-red-700 p-4 rounded-lg">
+                        <span class="text-4xl text-red-400">🚨</span>
+                        <div class="flex-grow">
+                            <h4 class="font-semibold text-white text-lg mb-1">Critical Incident Alert: Robbery in Progress</h4>
+                            <p class="text-sm text-gray-300">Location: 3rd Ave, Khayelitsha | Responder: RSP001 | Time: 10:35 AM</p>
+                            <p class="text-xs text-gray-400 mt-2">"Armed robbery happening right now at the tuck shop."</p>
+                            <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm mt-3" onclick="console.log('Acknowledged Robbery Alert from Dashboard')">Acknowledge</button>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- 1.1 Incidents Summary Section (dedicated page) -->
+            <section id="incident-summary" class="content-section hidden">
+                <h2 class="text-3xl font-bold text-white mb-6">Recent Incidents Summary</h2>
+                <p class="text-gray-300 mb-8">
+                    Detailed overview of all reported public safety incidents.
+                </p>
+                <div class="kpi-card">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-white">Incident Details</h3>
+                        <select id="languageFilterIncidents" class="bg-gray-700 text-gray-300 rounded-md p-2 text-sm border border-gray-600" onchange="populateIncidentSummaryTable(this.value, 'incidentSummaryTableBodyIncidents')">
+                            <option value="All">All Languages</option>
+                            <option value="Zulu">Zulu</option>
+                            <option value="Xhosa">Xhosa</option>
+                            <option value="English">English</option>
+                            <option value="Afrikaans">Afrikaans</option>
+                        </select>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead class="bg-gray-700">
+                                <tr>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Type</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Priority</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Time</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Location</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Status</th>
+                                    <th class="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Assigned</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incidentSummaryTableBodyIncidents" class="divide-y divide-gray-800">
+                                <!-- Table rows will be dynamically populated -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. Responder Management View -->
+            <section id="responder-management" class="content-section hidden">
+                <h2 class="text-3xl font-bold text-white mb-6">Responder Management</h2>
+                <p class="text-gray-300 mb-8">
+                    Live tracking and detailed management of all emergency responder units.
+                </p>
+
+                <!-- Live GPS Tracker -->
+                <div class="kpi-card h-80 flex items-center justify-center">
+                    <div class="w-full h-full bg-gray-900 rounded-lg flex items-center justify-center text-gray-500 text-lg fake-map-bg">
+                        <span class="text-gray-600 absolute top-4 left-4 text-sm">[Simulated Live GPS Map of Responder Units]</span>
+                         <!-- Fake Map Visual Elements for Responder Management -->
+                        <div class="fake-map-region absolute w-1/3 h-1/3 top-1/4 left-1/4"></div>
+                        <div class="fake-map-region absolute w-1/4 h-1/4 bottom-1/4 right-1/4"></div>
+                        <div class="fake-map-road" style="top: 30%; left: 0%; width: 100%; height: 5px; transform: rotate(10deg);"></div>
+                        <div class="fake-map-road" style="top: 60%; left: 0%; width: 100%; height: 5px; transform: rotate(-5deg);"></div>
+                        <div class="fake-map-road" style="top: 0%; left: 70%; height: 100%; width: 5px;"></div>
+                    </div>
+                </div>
+
+                <!-- Responder List and Profiles -->
+                <div class="kpi-card mt-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-xl font-semibold text-white">All Responders</h3>
+                        <div class="flex space-x-2">
+                            <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm transition-colors" onclick="console.log('Exporting Responder Data...')">Export</button>
+                            <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm transition-colors" onclick="console.log('Downloading Responder Reports...')">Download Reports</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Responder Card 1 -->
+                        <div class="bg-gray-700 p-4 rounded-lg flex flex-col border border-gray-600">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="font-semibold text-white text-lg">RSP001 - John Doe</h4>
+                                <span class="bg-emerald-600 text-white text-xs px-2 py-1 rounded-full">On Duty</span>
+                            </div>
+                            <p class="text-sm text-gray-300 mb-1">Badge: 12345</p>
+                            <p class="text-sm text-gray-300 mb-1">Availability: Next 6 hrs</p>
+                            <p class="text-sm text-gray-300 mb-1">Avg. Response: 4.1 min</p>
+                            <p class="text-sm text-blue-400 cursor-pointer mb-3" onclick="console.log('Viewing John Doe Location History')">[Location History Link]</p>
+                            <div class="flex space-x-2 mt-auto">
+                                <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm flex-1" onclick="console.log('Assigning Task to RSP001')">Assign Task</button>
+                                <button class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded-md text-sm flex-1" onclick="console.log('Sending Backup Request for RSP001')">Send Backup</button>
+                            </div>
+                        </div>
+                        <!-- Responder Card 2 -->
+                        <div class="bg-gray-700 p-4 rounded-lg flex flex-col border border-gray-600">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="font-semibold text-white text-lg">RSP002 - Jane Smith</h4>
+                                <span class="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">Responding</span>
+                            </div>
+                            <p class="text-sm text-gray-300 mb-1">Badge: 12346</p>
+                            <p class="text-sm text-gray-300 mb-1">Availability: Next 3 hrs</p>
+                            <p class="text-sm text-gray-300 mb-1">Avg. Response: 5.2 min</p>
+                            <p class="text-sm text-blue-400 cursor-pointer mb-3" onclick="console.log('Viewing Jane Smith Location History')">[Location History Link]</p>
+                            <div class="flex space-x-2 mt-auto">
+                                <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm flex-1" onclick="console.log('Assigning Task to RSP002')">Assign Task</button>
+                                <button class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded-md text-sm flex-1" onclick="console.log('Sending Backup Request for RSP002')">Send Backup</button>
+                            </div>
+                        </div>
+                        <!-- More responders... -->
+                    </div>
+                    <div class="mt-8 bg-gray-700 p-4 rounded-lg border border-gray-600">
+                        <h3 class="text-xl font-semibold text-white mb-3">Shift History</h3>
+                        <div class="h-48 bg-gray-900 rounded-md flex items-center justify-center text-gray-500">
+                            [Calendar/Timeline Widget Placeholder]
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. Incident Insights & Analytics Tab -->
+            <section id="incident-insights" class="content-section hidden">
+                <h2 class="text-3xl font-bold text-white mb-6">Incident Insights & Analytics</h2>
+                <p class="text-gray-300 mb-8">
+                    Visualize trends from AI-reported safety issues for data-driven decision making.
+                </p>
+
+                <!-- Filters -->
+                <div class="kpi-card mb-8 flex flex-wrap gap-4">
+                    <select class="bg-gray-700 text-gray-300 rounded-md p-2 text-sm border border-gray-600" onchange="console.log('City filter changed to: ' + this.value)">
+                        <option>All Cities</option>
+                        <option>Cape Town</option>
+                        <option>Johannesburg</option>
+                    </select>
+                    <select class="bg-gray-700 text-gray-300 rounded-md p-2 text-sm border border-gray-600" onchange="console.log('Region filter changed to: ' + this.value)">
+                        <option>All Regions</option>
+                        <option>Khayelitsha</option>
+                        <option>Soweto</option>
+                    </select>
+                    <select class="bg-gray-700 text-gray-300 rounded-md p-2 text-sm border border-gray-600" onchange="console.log('Urgency filter changed to: ' + this.value)">
+                        <option>All Urgency</option>
+                        <option>High</option>
+                        <option>Medium</option>
+                        <option>Low</option>
+                    </select>
+                    <select class="bg-gray-700 text-gray-300 rounded-md p-2 text-sm border border-gray-600" onchange="console.log('Language filter changed to: ' + this.value)">
+                        <option>All Languages</option>
+                        <option>Zulu</option>
+                        <option>Xhosa</option>
+                        <option>English</option>
+                    </select>
+                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm transition-colors" onclick="console.log('Exporting to PDF...')">Export to PDF</button>
+                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm transition-colors" onclick="console.log('Exporting to CSV...')">Export to CSV</button>
+                    <!-- Dark/Light Toggle -->
+                    <div class="flex items-center ml-auto">
+                        <span class="text-sm text-gray-300 mr-2">Light Mode</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" value="" class="sr-only peer" id="themeToggle" checked>
+                            <div class="w-11 h-6 bg-gray-500 rounded-full peer peer-focus:ring-2 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"></div>
+                            <span class="ml-2 text-sm text-gray-300">Dark Mode</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <div class="kpi-card chart-bg-theme">
+                        <h3 class="text-xl font-semibold text-white mb-4">Incidents Over Time</h3>
+                        <div class="chart-container">
+                            <canvas id="incidentsTimeChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="kpi-card chart-bg-theme">
+                        <h3 class="text-xl font-semibold text-white mb-4">Incidents by Type</h3>
+                        <div class="chart-container">
+                            <canvas id="incidentsTypeChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="kpi-card chart-bg-theme">
+                        <h3 class="text-xl font-semibold text-white mb-4">Report Sources</h3>
+                        <div class="chart-container">
+                            <canvas id="reportSourcesChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="kpi-card">
+                        <h3 class="text-xl font-semibold text-white mb-4">Sentiment Analysis Summary</h3>
+                        <p class="text-gray-300">
+                            Overall sentiment for recent reports: <span class="text-emerald-400 font-semibold">Predominantly Neutral to Urgent.</span>
+                        </p>
+                        <ul class="list-disc list-inside text-gray-400 mt-4 space-y-2">
+                            <li>Positive mentions (e.g., "safe", "secured"): 15%</li>
+                            <li>Neutral descriptions: 60%</li>
+                            <li>Urgent/Negative keywords (e.g., "danger", "robbery"): 25%</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. Heatmap + Patrol Zones -->
+            <section id="heatmap-patrol" class="content-section hidden">
+                <h2 class="text-3xl font-bold text-white mb-6">Heatmap & Patrol Zones</h2>
+                <p class="text-gray-300 mb-8">
+                    Visualize crime density and manage patrol unit coverage for optimized resource deployment.
+                </p>
+
+                <!-- Time Toggle -->
+                <div class="kpi-card mb-8 flex flex-wrap gap-4 items-center justify-center">
+                    <h3 class="text-xl font-semibold text-white mr-4">Heatmap Period:</h3>
+                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors" onclick="console.log('Heatmap period: Last 24h')">Last 24h</button>
+                    <button class="bg-gray-700 hover:bg-gray-600 text-gray-300 px-4 py-2 rounded-md transition-colors" onclick="console.log('Heatmap period: Last 7 days')">Last 7 days</button>
+                    <button class="bg-gray-700 hover:bg-gray-600 text-gray-300 px-4 py-2 rounded-md transition-colors" onclick="console.log('Heatmap period: Custom Date')">Custom Date</button>
+                    <button class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-md ml-auto transition-colors" onclick="showNewPatrolZoneModal()">+ Define New Patrol Zone</button>
+                </div>
+
+                <!-- Detailed Map UI -->
+                <div class="kpi-card mb-8 h-96 flex items-center justify-center">
+                    <div class="w-full h-full bg-gray-900 rounded-lg flex items-center justify-center text-gray-500 text-lg relative fake-map-bg">
+                        <span class="text-gray-600 absolute top-4 left-4 text-sm">[Simulated Detailed Map UI with Heatmap Layer and Patrol Zones]</span>
+                        <!-- Fake Map Visual Elements for Heatmap -->
+                        <div class="fake-map-region absolute w-1/3 h-1/3 top-10 left-10 opacity-70 bg-red-800">
+                            <span class="fake-map-label top-2 left-2 text-white">High Risk Zone A</span>
+                        </div>
+                        <div class="fake-map-region absolute w-1/4 h-1/4 bottom-5 right-5 opacity-70 bg-yellow-800">
+                            <span class="fake-map-label top-2 left-2 text-white">Medium Risk Zone B</span>
+                        </div>
+                        <div class="fake-map-road" style="top: 20%; left: 0%; width: 100%; height: 5px; transform: rotate(5deg);"></div>
+                        <div class="fake-map-road" style="top: 50%; left: 0%; width: 100%; height: 5px; transform: rotate(-10deg);"></div>
+                        <div class="fake-map-road" style="top: 0%; left: 40%; height: 100%; width: 5px;"></div>
+
+                        <!-- Example Zone Overlay -->
+                        <div class="absolute top-1/4 left-1/4 w-1/2 h-1/2 bg-red-500 opacity-30 rounded-lg border-2 border-red-700 cursor-pointer" onclick="showZoneStats('Zone 5', 32, '5 mins')"></div>
+                        <span class="absolute top-[35%] left-[35%] text-white text-lg font-bold z-10 pointer-events-none">Zone 5</span>
+                    </div>
+                </div>
+
+                <!-- Zone Stats Modal (initially hidden) -->
+                <div id="zoneStatsModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
+                    <div class="modal-content p-8 rounded-lg shadow-xl max-w-sm w-full">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-2xl font-bold" id="modalZoneName"></h3>
+                            <button class="text-gray-400 hover:text-white text-3xl" onclick="hideZoneStatsModal()">✖️</button>
+                        </div>
+                        <p class="text-gray-300 mb-2">Total Incidents: <span id="modalIncidents" class="font-semibold text-blue-400"></span></p>
+                        <p class="text-gray-300 mb-4">Average Response: <span id="modalAvgResponse" class="font-semibold text-emerald-400"></span></p>
+                        <p class="text-gray-400 text-sm">This zone currently shows a high concentration of reported incidents, indicating a priority area for patrol.</p>
+                    </div>
+                </div>
+
+                <!-- New Patrol Zone Modal (initially hidden) -->
+                <div id="newPatrolZoneModal" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 hidden">
+                    <div class="modal-content p-8 rounded-lg shadow-xl max-w-md w-full">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-2xl font-bold">Define New Patrol Zone</h3>
+                            <button class="text-gray-400 hover:text-white text-3xl" onclick="hideNewPatrolZoneModal()">✖️</button>
+                        </div>
+                        <div class="mb-4">
+                            <label for="zoneName" class="block text-gray-300 text-sm font-bold mb-2">Zone Name:</label>
+                            <input type="text" id="zoneName" class="shadow appearance-none border border-gray-600 rounded w-full py-2 px-3 bg-gray-700 text-white leading-tight focus:outline-none focus:shadow-outline" placeholder="e.g., Central Business District" onchange="console.log('New zone name input: ' + this.value)">
+                        </div>
+                        <div class="mb-4">
+                            <label for="zoneCoordinates" class="block text-gray-300 text-sm font-bold mb-2">Coordinates / Area (Simulated):</label>
+                            <textarea id="zoneCoordinates" class="shadow appearance-none border border-gray-600 rounded w-full py-2 px-3 bg-gray-700 text-white leading-tight focus:outline-none focus:shadow-outline h-24 resize-none" placeholder="e.g., Drag on map to define area..." onchange="console.log('New zone coordinates input: ' + this.value)"></textarea>
+                        </div>
+                        <button class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full" onclick="console.log('Saving New Zone...')">Save New Zone</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5. Supervisor Alerts + Notifications Center -->
+            <section id="supervisor-alerts" class="content-section hidden">
+                <h2 class="text-3xl font-bold text-white mb-6">Supervisor Alerts & Notifications</h2>
+                <p class="text-gray-300 mb-8">
+                    Receive and manage real-time notifications for critical incidents and system events.
+                </p>
+
+                <!-- Filter & Action Bar -->
+                <div class="kpi-card mb-8 flex flex-wrap gap-4">
+                    <select class="bg-gray-700 text-gray-300 rounded-md p-2 text-sm border border-gray-600" onchange="console.log('Alerts sorted by: ' + this.value)">
+                        <option>Sort by Urgency</option>
+                        <option>High to Low</option>
+                        <option>Low to High</option>
+                    </select>
+                    <select class="bg-gray-700 text-gray-300 rounded-md p-2 text-sm border border-gray-600" onchange="console.log('Alerts filtered by type: ' + this.value)">
+                        <option>Filter by Type</option>
+                        <option>Robbery</option>
+                        <option>Fire</option>
+                    </select>
+                    <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm transition-colors ml-auto" onclick="console.log('Sending Broadcast Message...')">Send Broadcast Message</button>
+                </div>
+
+                <!-- Alert Feed -->
+                <div class="space-y-4">
+                    <!-- Alert Card High Urgency -->
+                    <div class="kpi-card border border-red-600 flex items-start space-x-4">
+                        <span class="text-4xl text-red-600">🚨</span>
+                        <div class="flex-grow">
+                            <h3 class="font-semibold text-white text-lg mb-1">Critical Incident Alert: Robbery in Progress</h3>
+                            <p class="text-sm text-gray-300">Location: 3rd Ave, Khayelitsha | Responder: RSP001 | Time: 10:35 AM</p>
+                            <p class="text-xs text-gray-400 mt-2">"Armed robbery happening right now at the tuck shop."</p>
+                            <div class="mt-3 flex space-x-2">
+                                <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm" onclick="console.log('Acknowledged Robbery Alert')">Acknowledge</button>
+                                <button class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded-md text-sm" onclick="console.log('Reassigned Robbery Alert')">Reassign</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Alert Card Medium Urgency -->
+                    <div class="kpi-card border border-yellow-600 flex items-start space-x-4">
+                        <span class="text-4xl text-yellow-600">⚠️</span>
+                        <div class="flex-grow">
+                            <h3 class="font-semibold text-white text-lg mb-1">Backup Request: Accident</h3>
+                            <p class="text-sm text-gray-300">Location: Main Rd, Soweto | From: RSP002 | Time: 11:40 AM</p>
+                            <p class="text-xs text-gray-400 mt-2">"Need ambulance for injured party, road blocked."</p>
+                            <div class="mt-3 flex space-x-2">
+                                <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-sm" onclick="console.log('Acknowledged Backup Request')">Acknowledge</button>
+                                <button class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1 rounded-md text-sm" onclick="console.log('Reassigned Backup Request')">Reassign</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- AI Chatbot Integration Panel -->
+                    <div class="kpi-card">
+                        <h3 class="text-xl font-semibold text-white mb-4">AI Chatbot Integration</h3>
+                        <p class="text-gray-300 mb-2">Automated messages and critical alerts from SafeZone AI chatbot are routed here for supervisor review and action.</p>
+                        <p class="text-sm text-gray-500">Last bot message processed: "Citizen reported a loud dispute near market street." (12:05 PM)</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 6. Linked Mobile Responder App (Companion UI Description) -->
+            <section id="linked-mobile-app" class="content-section hidden">
+                <h2 class="text-3xl font-bold text-white mb-6">Linked Mobile Responder App</h2>
+                <p class="text-gray-300 mb-8">
+                    The SafeZone AI Mobile Responder App is the companion UI for field responders, providing critical tools and real-time updates directly on their mobile devices.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="kpi-card">
+                        <h3 class="text-xl font-semibold text-white mb-4">Key Mobile Features</h3>
+                        <ul class="list-disc list-inside text-gray-300 space-y-3">
+                            <li>**Live Job Alert Screen:** Instant notifications with "Accept" button and incident route map.</li>
+                            <li>**Arrival Screen:** Options to "Mark Arrived," "Request Backup," "Mark Resolved" upon reaching location.</li>
+                            <li>**Incident Chat:** Real-time communication with citizens (if enabled) and other responders.</li>
+                            <li>**Performance Dashboard:** Individual stats for total jobs, average ETA, and user ratings.</li>
+                            <li>**Multilingual Toggle:** Supports various South African languages for inclusive communication.</li>
+                            <li>**App Notifications:** Push notifications for critical updates and new incidents.</li>
+                            <li>**Night Mode:** Optimized display for low-light conditions.</li>
+                        </ul>
+                    </div>
+                    <div class="kpi-card flex items-center justify-center">
+                        <div class="w-64 h-96 bg-gray-900 rounded-lg flex items-center justify-center text-gray-500 text-center text-lg">
+                            [Mobile App Screen Mockup Placeholder]
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="settings" class="content-section hidden">
+                <h2 class="text-3xl font-bold text-white mb-6">Settings</h2>
+                <p class="text-gray-300 mb-8">
+                    Manage system configurations, user permissions, and notification preferences.
+                </p>
+                <div class="kpi-card">
+                    <h3 class="text-xl font-semibold text-white mb-4">General Settings</h3>
+                    <p class="text-gray-300">Placeholder for various configuration options.</p>
+                    <ul class="list-disc list-inside text-gray-400 mt-4 space-y-2">
+                        <li>User Management</li>
+                        <li>Notification Preferences</li>
+                        <li>Data Retention Policies</li>
+                    </ul>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const sidebarLinks = document.querySelectorAll('.sidebar-nav-link');
+            const contentSections = document.querySelectorAll('.content-section');
+            const themeToggle = document.getElementById('themeToggle');
+            const body = document.body;
+            const languageFilterIncidents = document.getElementById('languageFilterIncidents');
+            const languageFilterDashboard = document.getElementById('languageFilterDashboard');
+            const dashboardMapPinsContainer = document.getElementById('dashboardMapPinsContainer');
+
+            // --- Static Data for Tables and Charts ---
+            const incidentsData = [
+                { id: 'inc1', type: 'Robbery', priority: 'High', time: '10:30 AM', location: 'Langa Taxi Rank', status: 'Responding', assigned: 'RSP001', language: 'Xhosa', icon: '🚨', mapTop: '30%', mapLeft: '20%', summary: 'Armed robbery in progress at local shop.' },
+                { id: 'inc2', type: 'Assault', priority: 'Medium', time: '09:45 AM', location: 'Gugulethu Mall', status: 'Pending', assigned: 'N/A', language: 'Zulu', icon: '💥', mapTop: '50%', mapLeft: '60%', summary: 'Verbal dispute escalated to minor assault.' },
+                { id: 'inc3', type: 'Fire', priority: 'High', time: '08:00 AM', location: 'Nyanga Industrial', status: 'Resolved', assigned: 'RSP003', language: 'English', icon: '🔥', mapTop: '70%', mapLeft: '40%', summary: 'Small industrial fire brought under control.' },
+                { id: 'inc4', type: 'Vandalism', priority: 'Low', time: '07:30 AM', location: 'Khayelitsha Park', status: 'Closed', assigned: 'RSP002', language: 'Afrikaans', icon: '🎨', mapTop: '25%', mapLeft: '75%', summary: 'Public property vandalized with graffiti.' },
+                { id: 'inc5', type: 'Theft', priority: 'Medium', time: '06:00 AM', location: 'Soweto Market', status: 'Pending', assigned: 'N/A', language: 'English', icon: '💰', mapTop: '65%', mapLeft: '35%', summary: 'Pickpocketing reported at busy market.' },
+                { id: 'inc6', type: 'Dispute', priority: 'Low', time: '05:00 AM', location: 'Alexandria Flats', status: 'Resolved', assigned: 'RSP004', language: 'Zulu', icon: '🗣️', mapTop: '40%', mapLeft: '10%', summary: 'Neighbor dispute resolved by local police.' }
+            ];
+
+            // Chart Data
+            const incidentsTimeData = {
+                labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                datasets: [{
+                    label: 'Incidents per Day',
+                    data: [30, 45, 50, 35, 60, 55, 40],
+                    borderColor: '#3B82F6', /* blue-500 */
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            };
+
+            const incidentsTypeData = {
+                labels: ['Theft', 'Assault', 'Fire', 'Vandalism', 'Other'],
+                datasets: [{
+                    label: 'Incidents by Type',
+                    data: [120, 80, 50, 40, 60],
+                    backgroundColor: [
+                        '#3B82F6', /* blue-500 */
+                        '#E53E3E', /* red-600 */
+                        '#F6AD55', /* yellow-600 */
+                        '#10B981', /* emerald-500 */
+                        '#6B7280'  /* gray-500 */
+                    ],
+                    borderColor: 'transparent', /* Will be set by theme dynamically */
+                    borderWidth: 1
+                }]
+            };
+
+            const reportSourcesData = {
+                labels: ['WhatsApp', 'SMS', 'Hotline', 'Dashboard'],
+                datasets: [{
+                    data: [65, 20, 10, 5],
+                    backgroundColor: [
+                        '#10B981', /* emerald-500 */
+                        '#3B82F6', /* blue-500 */
+                        '#6B7280', /* gray-500 */
+                        '#F6AD55'  /* yellow-600 */
+                    ],
+                    borderColor: 'transparent', /* Will be set by theme dynamically */
+                    borderWidth: 1
+                }]
+            };
+
+            // --- Chart Configuration Functions ---
+            const getChartColors = () => {
+                const isDarkMode = body.classList.contains('dark-theme');
+                return {
+                    fontColor: isDarkMode ? 'var(--text-secondary)' : 'var(--text-secondary)',
+                    gridColor: isDarkMode ? 'var(--chart-grid)' : 'var(--chart-grid)',
+                    tooltipBg: isDarkMode ? 'var(--chart-tooltip-bg)' : 'var(--chart-tooltip-bg)',
+                    tooltipBorder: isDarkMode ? 'var(--chart-tooltip-border)' : 'var(--chart-tooltip-border)'
+                };
+            };
+
+            const createChart = (ctx, type, data, options) => {
+                const colors = getChartColors();
+                const defaultOptions = {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: colors.fontColor // Dynamic label color
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: colors.tooltipBg,
+                            titleColor: colors.fontColor,
+                            bodyColor: colors.fontColor,
+                            borderColor: colors.tooltipBorder,
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: colors.fontColor // Dynamic x-axis labels
+                            },
+                            grid: {
+                                color: colors.gridColor // Dynamic x-axis grid lines
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: colors.fontColor // Dynamic y-axis labels
+                            },
+                            grid: {
+                                color: colors.gridColor // Dynamic y-axis grid lines
+                            }
+                        }
+                    }
+                };
+
+                // Apply dynamic border color to datasets where applicable
+                if (data.datasets) {
+                    data.datasets.forEach(dataset => {
+                        if (type === 'bar' || type === 'pie' || type === 'doughnut') {
+                            dataset.borderColor = body.classList.contains('dark-theme') ? '#2D3748' : '#FFFFFF';
+                        }
+                    });
+                }
+
+                return new Chart(ctx, {
+                    type: type,
+                    data: data,
+                    options: { ...defaultOptions, ...options }
+                });
+            };
+
+            let incidentsTimeChart, incidentsTypeChart, reportSourcesChart;
+
+            // Function to render all charts
+            const renderCharts = () => {
+                // Ensure canvases exist before attempting to get context
+                const incidentsTimeCanvas = document.getElementById('incidentsTimeChart');
+                const incidentsTypeCanvas = document.getElementById('incidentsTypeChart');
+                const reportSourcesCanvas = document.getElementById('reportSourcesChart');
+
+                if (incidentsTimeCanvas) {
+                    const incidentsTimeCtx = incidentsTimeCanvas.getContext('2d');
+                    if (incidentsTimeChart) incidentsTimeChart.destroy();
+                    incidentsTimeChart = createChart(incidentsTimeCtx, 'line', incidentsTimeData, {
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Number of Incidents',
+                                    color: getChartColors().fontColor
+                                }
+                            }
+                        }
+                    });
+                }
+
+                if (incidentsTypeCanvas) {
+                    const incidentsTypeCtx = incidentsTypeCanvas.getContext('2d');
+                    if (incidentsTypeChart) incidentsTypeChart.destroy();
+                    incidentsTypeChart = createChart(incidentsTypeCtx, 'bar', incidentsTypeData, {
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Count',
+                                    color: getChartColors().fontColor
+                                }
+                            }
+                        }
+                    });
+                }
+
+                if (reportSourcesCanvas) {
+                    const reportSourcesCtx = reportSourcesCanvas.getContext('2d');
+                    if (reportSourcesChart) reportSourcesChart.destroy();
+                    reportSourcesChart = createChart(reportSourcesCtx, 'pie', reportSourcesData, {
+                        scales: {}, // No scales for pie chart
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    color: getChartColors().fontColor
+                                }
+                            }
+                        }
+                    });
+                }
+            };
+
+            // --- General Navigation and UI Logic ---
+            function showSection(sectionId) {
+                contentSections.forEach(section => {
+                    if (section) {
+                        section.classList.remove('active');
+                        section.classList.add('hidden');
+                    }
+                });
+
+                const targetContentSection = document.getElementById(sectionId);
+                if (targetContentSection) {
+                    targetContentSection.classList.remove('hidden');
+                    targetContentSection.classList.add('active');
+                } else {
+                    console.error(`Error: Content section with ID "${sectionId}" not found.`);
+                    return;
+                }
+
+                sidebarLinks.forEach(link => {
+                    if (link) {
+                        link.classList.remove('active');
+                    }
+                });
+
+                const targetSidebarLink = document.querySelector(`a[href="#${sectionId}"]`);
+                if (targetSidebarLink) {
+                    targetSidebarLink.classList.add('active');
+                } else {
+                    console.error(`Error: Sidebar link with href="#${sectionId}" not found.`);
+                }
+
+                // Call specific populate functions when sections are shown
+                if (sectionId === 'incident-summary') {
+                    populateIncidentSummaryTable(languageFilterIncidents.value, 'incidentSummaryTableBodyIncidents');
+                }
+                if (sectionId === 'main-dashboard') {
+                    populateIncidentSummaryTable(languageFilterDashboard.value, 'incidentSummaryTableBodyDashboard');
+                    populateDashboardMapPins(); // Ensure pins are populated if navigating back to dashboard
+                }
+                if (sectionId === 'incident-insights') {
+                    renderCharts();
+                }
+            }
+
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const sectionId = this.getAttribute('href').substring(1);
+                    showSection(sectionId);
+                });
+            });
+
+            // Set initial active section
+            showSection('main-dashboard');
+
+            // --- Theme Toggle Functionality ---
+            themeToggle.addEventListener('change', function() {
+                if (this.checked) {
+                    body.classList.add('dark-theme');
+                    body.classList.remove('light-theme');
+                } else {
+                    body.classList.remove('dark-theme');
+                    body.classList.add('light-theme');
+                }
+                // Re-render charts to apply theme changes if on analytics tab
+                if (document.getElementById('incident-insights').classList.contains('active')) {
+                    renderCharts();
+                }
+                // Re-populate table to ensure text colors adjust for both tables
+                if (document.getElementById('incident-summary').classList.contains('active')) {
+                    populateIncidentSummaryTable(languageFilterIncidents.value, 'incidentSummaryTableBodyIncidents');
+                }
+                if (document.getElementById('main-dashboard').classList.contains('active')) {
+                    populateIncidentSummaryTable(languageFilterDashboard.value, 'incidentSummaryTableBodyDashboard');
+                }
+            });
+
+            // Initialize theme on load based on checkbox state (default dark)
+            themeToggle.checked = true; // Ensure it starts as dark theme (checked for dark)
+            body.classList.add('dark-theme'); // Apply dark theme by default
+
+            // --- Incident Summary Table Filtering ---
+            function populateIncidentSummaryTable(filterLanguage = 'All', tableBodyId) {
+                const tbody = document.getElementById(tableBodyId);
+                if (!tbody) return;
+
+                tbody.innerHTML = ''; // Clear existing rows
+
+                const filteredData = incidentsData.filter(incident => {
+                    return filterLanguage === 'All' || incident.language === filterLanguage;
+                });
+
+                filteredData.forEach(incident => {
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-gray-700'; // Dark theme hover
+
+                    let statusClass = '';
+                    let priorityClass = '';
+
+                    switch(incident.status) {
+                        case 'Responding': statusClass = 'bg-blue-600'; break;
+                        case 'Pending': statusClass = 'bg-yellow-600'; break;
+                        case 'Resolved': statusClass = 'bg-emerald-600'; break;
+                        case 'Closed': statusClass = 'bg-gray-600'; break;
+                    }
+
+                    switch(incident.priority) {
+                        case 'High': priorityClass = 'text-red-400'; break;
+                        case 'Medium': priorityClass = 'text-yellow-400'; break;
+                        case 'Low': priorityClass = 'text-emerald-400'; break;
+                    }
+
+                    row.innerHTML = `
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-300">${incident.type}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm ${priorityClass}">${incident.priority}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-300">${incident.time}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-300">${incident.location}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass} text-white">${incident.status}</span></td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-300">${incident.assigned}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            // Event listeners for both language filters
+            if (languageFilterIncidents) {
+                languageFilterIncidents.addEventListener('change', (event) => {
+                    populateIncidentSummaryTable(event.target.value, 'incidentSummaryTableBodyIncidents');
+                    console.log('Incidents table language filter changed to: ' + event.target.value);
+                });
+            }
+            if (languageFilterDashboard) {
+                languageFilterDashboard.addEventListener('change', (event) => {
+                    populateIncidentSummaryTable(event.target.value, 'incidentSummaryTableBodyDashboard');
+                    console.log('Dashboard table language filter changed to: ' + event.target.value);
+                });
+            }
+
+
+            // --- Map Info Box Functions ---
+            const mapInfoBoxContainer = document.getElementById('mapInfoBoxContainer');
+
+            // Function to generate dynamic map pins
+            function populateDashboardMapPins() {
+                dashboardMapPinsContainer.innerHTML = ''; // Clear existing pins
+                incidentsData.forEach(incident => {
+                    const pin = document.createElement('div');
+                    let bgColor = '';
+                    switch (incident.priority) {
+                        case 'High': bgColor = 'bg-red-600'; break;
+                        case 'Medium': bgColor = 'bg-yellow-600'; break;
+                        case 'Low': bgColor = 'bg-emerald-600'; break;
+                        default: bgColor = 'bg-blue-600'; // Default color
+                    }
+                    pin.className = `absolute w-8 h-8 rounded-full ${bgColor} flex items-center justify-center text-xl text-white font-bold cursor-pointer map-pin`;
+                    pin.style.top = incident.mapTop;
+                    pin.style.left = incident.mapLeft;
+                    pin.setAttribute('data-incident-id', incident.id);
+                    pin.onclick = (event) => {
+                        showMapInfoBox(event, incident.id);
+                        console.log(`Clicked on map pin for incident ID: ${incident.id}`);
+                    };
+                    pin.textContent = incident.icon;
+                    dashboardMapPinsContainer.appendChild(pin);
+                });
+            }
+            populateDashboardMapPins(); // Populate pins on load
+
+            window.showMapInfoBox = function(event, incidentId) {
+                const incident = incidentsData.find(inc => inc.id === incidentId);
+                if (!incident) return;
+
+                // Clear any existing info boxes
+                mapInfoBoxContainer.innerHTML = '';
+
+                const box = document.createElement('div');
+                // Removed dynamic positioning in favor of Tailwind's centering classes
+                box.className = 'map-info-box absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2';
+
+                let urgencyColorClass = '';
+                switch(incident.priority) { // Using priority for urgency color
+                    case 'High': urgencyColorClass = 'text-red-400'; break;
+                    case 'Medium': urgencyColorClass = 'text-yellow-400'; break;
+                    case 'Low': urgencyColorClass = 'text-emerald-400'; break;
+                }
+
+                box.innerHTML = `
+                    <span class="map-info-box-close" onclick="this.parentNode.remove(); console.log('Map info box closed.')">✖️</span>
+                    <h4 class="font-bold text-base mb-1">${incident.type}</h4>
+                    <p class="text-xs text-gray-300 mb-1">${incident.location}</p>
+                    <p class="text-xs ${urgencyColorClass} font-semibold mb-2">Urgency: ${incident.priority}</p>
+                    <p id="incidentSummary_${incidentId}" class="text-xs text-gray-400 mb-2">${incident.summary}</p>
+                    <div id="aiActionPlanContainer_${incidentId}"></div>
+                    <button class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm py-1.5 rounded-md mt-2" onclick="getAIActionPlan('${incidentId}')">✨ Get AI Action Plan</button>
+                `;
+                mapInfoBoxContainer.appendChild(box);
+            };
+
+            // Close info box if clicking anywhere else on the map container (outside pins or info box itself)
+            dashboardMapPinsContainer.addEventListener('click', function(event) {
+                if (!event.target.closest('.map-pin') && !event.target.closest('.map-info-box')) {
+                    mapInfoBoxContainer.innerHTML = '';
+                }
+            });
+
+            // --- LLM Integration Function ---
+            async function getAIActionPlan(incidentId) {
+                const incident = incidentsData.find(inc => inc.id === incidentId);
+                if (!incident) return;
+
+                const aiActionPlanContainer = document.getElementById(`aiActionPlanContainer_${incidentId}`);
+                if (!aiActionPlanContainer) return;
+
+                // Display loading spinner
+                aiActionPlanContainer.innerHTML = `
+                    <div class="flex items-center justify-center mt-2">
+                        <div class="spinner mr-2"></div>
+                        <span class="text-sm text-gray-400">Generating AI plan...</span>
+                    </div>
+                `;
+                console.log(`Generating AI action plan for incident ID: ${incidentId}...`);
+
+                // Construct a prompt for the LLM
+                const prompt = `Based on the following incident:
+                Type: ${incident.type}
+                Priority: ${incident.priority}
+                Location: ${incident.location}
+                Summary: ${incident.summary}
+                
+                Generate a concise, professional action plan for a police supervisor. Include immediate steps, potential resources needed, and expected outcomes. Start directly with the action plan.`;
+
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = { contents: chatHistory };
+                const apiKey = ""; // If you want to use models other than gemini-2.0-flash or imagen-3.0-generate-002, provide an API key here. Otherwise, leave this as-is.
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    const result = await response.json(); // Await the JSON parsing
+
+                    if (result.candidates && result.candidates.length > 0 &&
+                        result.candidates[0].content && result.candidates[0].content.parts &&
+                        result.candidates[0].content.parts.length > 0) {
+                        const text = result.candidates[0].content.parts[0].text;
+                        aiActionPlanContainer.innerHTML = `
+                            <p class="text-xs font-semibold text-gray-300 mt-2 mb-1">AI Action Plan:</p>
+                            <p class="text-xs text-emerald-300">${text}</p>
+                        `;
+                        console.log(`AI Action Plan generated for ${incidentId}:`, text);
+                    } else {
+                        aiActionPlanContainer.innerHTML = '<p class="text-xs text-red-400 mt-2">Error: Could not generate AI plan.</p>';
+                        console.error("Error: Unexpected LLM response structure or no content.");
+                    }
+                } catch (error) {
+                    aiActionPlanContainer.innerHTML = '<p class="text-xs text-red-400 mt-2">Error: Failed to fetch AI plan.</p>';
+                    console.error("Error fetching AI action plan:", error);
+                }
+            }
+            window.getAIActionPlan = getAIActionPlan; // Make it globally accessible
+
+            // --- Heatmap + Patrol Zone Modal Functions ---
+            window.showZoneStats = function(zoneName, incidentsCount, avgResponse) {
+                document.getElementById('modalZoneName').textContent = zoneName;
+                document.getElementById('modalIncidents').textContent = incidentsCount;
+                document.getElementById('modalAvgResponse').textContent = avgResponse;
+                document.getElementById('zoneStatsModal').classList.remove('hidden');
+                console.log(`Showing stats for ${zoneName}: ${incidentsCount} incidents, avg. response ${avgResponse}.`);
+            }
+
+            window.hideZoneStatsModal = function() {
+                document.getElementById('zoneStatsModal').classList.add('hidden');
+                console.log('Zone Stats Modal hidden.');
+            }
+
+            window.showNewPatrolZoneModal = function() {
+                document.getElementById('newPatrolZoneModal').classList.remove('hidden');
+                console.log('New Patrol Zone Modal shown.');
+            }
+
+            window.hideNewPatrolZoneModal = function() {
+                document.getElementById('newPatrolZoneModal').classList.add('hidden');
+                console.log('New Patrol Zone Modal hidden.');
+            }
+        });
+    </script>
+</body>
+</html>
