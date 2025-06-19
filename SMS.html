@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeZone AI SMS Processor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #0F172A; /* Dark background for the whole page */
+            color: #E2E8F0; /* Light text */
+            overflow: hidden; /* Prevent body scroll */
+        }
+
+        /* Phone Frame Styles */
+        .phone-frame {
+            position: relative;
+            width: 375px; /* Increased phone width from 320px */
+            height: 640px; /* Standard phone height */
+            background-color: #000; /* Black for the phone body */
+            border-radius: 40px; /* More rounded corners for the phone */
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+            padding: 10px; /* Inner padding to simulate bezel */
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            align-items: center;
+            overflow: hidden; /* Hide content overflow within the frame */
+        }
+
+        .phone-frame::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px; /* Notch width */
+            height: 25px; /* Notch height */
+            background-color: #000;
+            border-bottom-left-radius: 15px;
+            border-bottom-right-radius: 15px;
+            z-index: 10;
+        }
+
+        /* Status Bar (Time, Battery) */
+        .status-bar {
+            width: calc(100% - 20px); /* Adjust for padding of phone-frame */
+            height: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+            font-size: 0.75rem;
+            color: white;
+            position: absolute;
+            top: 15px; /* Position below the notch area */
+            z-index: 11; /* Above the container */
+        }
+
+        /* Adjustments for the inner content to fit the phone screen */
+        .container {
+            background-color: #1A202C; /* Slightly lighter dark for the card */
+            border: 1px solid #2D3748; /* Darker border */
+            padding: 1.5rem; /* Reduced padding for phone screen */
+            border-radius: 8px; /* Slightly less rounded than phone frame */
+            box-shadow: none; /* Remove inner shadow */
+            max-width: 100%; /* Take full width of phone screen */
+            width: 100%; /* Take full width of phone screen */
+            height: calc(100% - 35px); /* Adjust for notch */
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; /* Space out elements vertically */
+            margin-top: 35px; /* Push content down below the status bar/notch */
+        }
+        h1 {
+            color: #3B82F6; /* Blue accent */
+            margin-bottom: 1rem; /* Adjusted margin */
+            font-size: 1.75rem; /* Slightly smaller for phone */
+        }
+        p.mb-6 {
+            margin-bottom: 1rem; /* Adjusted margin */
+            font-size: 0.85rem;
+        }
+        textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid #4A5568;
+            background-color: #2D3748; /* Darker input background */
+            color: #E2E8F0;
+            resize: none; /* Prevent manual resize on phone */
+            min-height: 80px; /* Smaller min-height for phone */
+            box-sizing: border-box; /* Include padding in width/height */
+            flex-grow: 1; /* Allow textarea to take available space */
+            margin-bottom: 1rem; /* Added margin */
+        }
+        button {
+            background-color: #3B82F6; /* Blue button */
+            color: white;
+            padding: 0.75rem 1rem; /* Adjusted padding */
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out;
+            margin-top: 0.5rem; /* Adjusted margin */
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #2563EB; /* Darker blue on hover */
+        }
+        #responseArea {
+            margin-top: 1rem; /* Adjusted margin */
+            padding: 0.75rem; /* Adjusted padding */
+            background-color: #2D3748; /* Response area background */
+            border: 1px solid #4A5568;
+            border-radius: 8px;
+            text-align: left;
+            min-height: 40px; /* Smaller min-height for phone */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem; /* Smaller font for response */
+            color: #A0AEC0; /* Grey text for response */
+            white-space: pre-wrap; /* Preserve whitespace and wrap text */
+            word-wrap: break-word; /* Break long words */
+            overflow-y: auto; /* Allow scrolling for long responses */
+            flex-shrink: 0; /* Prevent it from shrinking */
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #3B82F6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .error-message {
+            color: #EF4444; /* Red for error */
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+        .success-message {
+            color: #10B981; /* Emerald for success */
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-frame">
+        <!-- Phone Status Bar -->
+        <div class="status-bar">
+            <span id="currentTime">9:41 AM</span>
+            <div class="flex items-center space-x-1">
+                <span>📶</span> <!-- Signal icon -->
+                <span>🔋 <span id="batteryPercentage">85%</span></span> <!-- Battery icon and percentage -->
+            </div>
+        </div>
+
+        <div class="container">
+            <div>
+                <h1 class="text-3xl font-extrabold">SafeZone AI SMS</h1>
+                <p class="text-gray-400 mb-6">Enter an emergency SMS report to see how SafeZone AI would process it.</p>
+            </div>
+            
+            <textarea id="smsInput" placeholder="Type your emergency SMS here... (e.g., 'I just saw a robbery near my house' or 'Uphuthumayo eKhayelitsha, please come')" rows="4"></textarea>
+            
+            <button id="sendSmsBtn">Send SMS</button>
+            
+            <div id="responseArea">
+                Your AI-generated response will appear here.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const smsInput = document.getElementById('smsInput');
+            const sendSmsBtn = document.getElementById('sendSmsBtn');
+            const responseArea = document.getElementById('responseArea');
+            const currentTimeSpan = document.getElementById('currentTime');
+
+            // Function to update the current time
+            function updateCurrentTime() {
+                const now = new Date();
+                const hours = now.getHours();
+                const minutes = now.getMinutes();
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                const formattedHours = hours % 12 === 0 ? 12 : hours % 12;
+                const formattedMinutes = minutes < 10 ? '0' + minutes : minutes;
+                currentTimeSpan.textContent = `${formattedHours}:${formattedMinutes} ${ampm}`;
+            }
+
+            // Update time every minute
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 60000);
+
+            // Function to generate a random tracking ID for the demo
+            function generateTrackingId() {
+                return Math.floor(100000 + Math.random() * 900000);
+            }
+
+            sendSmsBtn.addEventListener('click', () => { // Removed async as no fetch
+                const userSms = smsInput.value.trim();
+                if (!userSms) {
+                    responseArea.innerHTML = '<span class="error-message">Please enter an SMS to process.</span>';
+                    console.warn("SMS input is empty.");
+                    return;
+                }
+
+                // Display loading state
+                responseArea.innerHTML = `
+                    <div class="flex items-center justify-center">
+                        <div class="spinner"></div>
+                        <span>Processing SMS...</span>
+                    </div>
+                `;
+                sendSmsBtn.disabled = true; // Disable button during processing
+                console.log(`Sending SMS for local processing: "${userSms}"`);
+
+                // Simulate processing time
+                setTimeout(() => {
+                    // Local logic to process SMS (no LLM call)
+                    const processedResponse = processSmsLocally(userSms);
+                    responseArea.innerHTML = `<span class="success-message">${processedResponse}</span>`;
+                    console.log("Local AI Response:", processedResponse);
+                    sendSmsBtn.disabled = false; // Re-enable button
+                }, 1500); // Simulate network delay
+            });
+
+            // --- Local SMS Processing Logic (REPLACES LLM CALL) ---
+            function processSmsLocally(sms) {
+                const lowerSms = sms.toLowerCase();
+                let incidentType = "General Safety Concern";
+                let location = "Unspecified location";
+                let emoji = "💡"; // Default emoji
+                let details = "";
+                let trackingId = generateTrackingId();
+
+                // Simple language detection (can be expanded)
+                let language = "English";
+                if (lowerSms.includes("sawubona") || lowerSms.includes("uphuthumayo") || lowerSms.includes("kukhona")) {
+                    language = "Zulu";
+                } else if (lowerSms.includes("umkhuba")) { // Example for Xhosa
+                    language = "Xhosa";
+                } else if (lowerSms.includes("help") && lowerSms.includes("dringend")) { // Example for Afrikaans
+                    language = "Afrikaans";
+                }
+
+
+                // Incident Classification & Emoji
+                if (lowerSms.includes("robbery") || lowerSms.includes("weba") || lowerSms.includes("armed")) {
+                    incidentType = "Robbery";
+                    emoji = "🚨";
+                } else if (lowerSms.includes("attack") || lowerSms.includes("assault") || lowerSms.includes("fighting")) {
+                    incidentType = "Assault";
+                    emoji = "�";
+                } else if (lowerSms.includes("fire") || lowerSms.includes("umlilo")) {
+                    incidentType = "Fire";
+                    emoji = "🔥";
+                } else if (lowerSms.includes("suspicious") || lowerSms.includes("strange")) {
+                    incidentType = "Suspicious Activity";
+                    emoji = "👀";
+                } else if (lowerSms.includes("theft") || lowerSms.includes("stolen") || lowerSms.includes("ukweba")) {
+                    incidentType = "Theft";
+                    emoji = "💰";
+                } else if (lowerSms.includes("dispute") || lowerSms.includes("noise") || lowerSms.includes("loud")) {
+                    incidentType = "Disturbance";
+                    emoji = "🗣️";
+                } else if (lowerSms.includes("accident") || lowerSms.includes("crash")) {
+                    incidentType = "Accident";
+                    emoji = "💥";
+                } else if (lowerSms.includes("help") || lowerSms.includes("emergency") || lowerSms.includes("urgent")) {
+                    incidentType = "Emergency";
+                    emoji = "🆘";
+                }
+
+                // Location Extraction (simple keywords)
+                const locations = {
+                    "khayelitsha": "Khayelitsha", "soweto": "Soweto", "taxi rank": "Taxi Rank",
+                    "main street": "Main Street", "shoprite": "Shoprite", "gugulethu mall": "Gugulethu Mall",
+                    "nyanga": "Nyanga Industrial", "park": "Park", "market": "Market"
+                };
+                for (const key in locations) {
+                    if (lowerSms.includes(key)) {
+                        location = locations[key];
+                        break;
+                    }
+                }
+
+                // Specific Details for Robbery/Assault (more sophisticated regex/keywords)
+                if (incidentType === "Robbery" || incidentType === "Assault") {
+                    const suspectMatch = lowerSms.match(/(\d+)\s+(guys|people|suspects)/);
+                    if (suspectMatch) {
+                        details += `${suspectMatch[1]} ${suspectMatch[2]}`;
+                    }
+
+                    const weaponMatch = lowerSms.match(/(with|saw|have)\s+(a\s+)?(gun|knife|weapon|machete)s?/);
+                    if (weaponMatch) {
+                        details += (details ? ", " : "") + `${weaponMatch[3]} seen`;
+                    }
+
+                    const directionMatch = lowerSms.match(/(fled|running|left|headed)\s+(north|south|east|west|towards)\s+([a-zA-Z\s]+)?/);
+                    if (directionMatch) {
+                        details += (details ? ", " : "") + `fled ${directionMatch[2]}${directionMatch[3] ? " " + directionMatch[3] : ""}`;
+                    }
+
+                    const vehicleMatch = lowerSms.match(/(in a|a)\s+(blue|red|white|black|silver)?\s*(car|van|bakkie|sedan|truck)/);
+                    if (vehicleMatch) {
+                        details += (details ? ", " : "") + `${vehicleMatch[2] ? vehicleMatch[2] + " " : ""}${vehicleMatch[3]}`;
+                        const plateMatch = lowerSms.match(/(plate|licence)\s*([a-zA-Z0-9]+)/);
+                        if (plateMatch) {
+                            details += ` (plate: ${plateMatch[2]})`;
+                        }
+                    }
+                }
+
+                let responseMessage;
+                const baseResponse = "Thanks for reporting. Your message has been received anonymously.";
+                const trackingLink = `Track response: www.safezone.co.za/track?id=${trackingId}`;
+
+                if (incidentType === "Emergency" && (location === "Unspecified location" || !lowerSms.includes("describe"))) {
+                    responseMessage = `🆘 ${baseResponse}\n\nIf this is a life-threatening emergency, please call:\n📞 10111 (SAPS)\n📞 10177 (Ambulance)\n\nFor immediate community response, please describe your emergency and location.`;
+                } else if (incidentType === "Help") {
+                    responseMessage = `❓ ${baseResponse}\n\nI can help you with:\n• Report crimes anonymously\n• Handle emergencies\n• Report suspicious activities\n• Community safety tips\n\nJust tell me what you need!`;
+                } else {
+                    let incidentLine = `${emoji} ${incidentType} 📍 Location: ${location}`;
+                    if (details) {
+                        incidentLine += ` (${details})`;
+                    }
+                    responseMessage = `${baseResponse}\n\n${incidentLine}\n✅ Your report has been sent to local responders.\n${trackingLink}`;
+                }
+                
+                return responseMessage;
+            }
+        });
+    </script>
+</body>
+</html>
+�
